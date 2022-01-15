@@ -1,0 +1,18 @@
+cidr_v: 172.16.0.0/16
+
+services:
+- docker
+- kubelet
+- firewalld
+
+ports:
+- "80/tcp"
+- "443/tcp"
+- "2222/tcp"
+- "6443/tcp"
+- "2379-2380/tcp"
+- "10250-10252/tcp"
+
+token_file: join_token
+
+calico_network: https://gist.githubusercontent.com/moody1511/b81d97f36099995d233dedc8f9d5cd67/raw/9be8b7479242f3a8a1ce38b85608a9ae64fc2d6b/caliconetworkha.yaml

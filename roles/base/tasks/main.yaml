@@ -1,0 +1,153 @@
+- name: Upgrade all packages
+  yum:
+    name: '*'
+    state: latest
+
+- name: Install bash-completion package
+  yum:
+    name: bash-completion
+    state: latest
+
+- name: Setting up Selinux to permissive
+  selinux:
+    policy: targeted
+    state: permissive
+
+- name: Disabling Swap on all nodes
+  shell: swapoff -a
+
+- name: Commenting Swap entries in /etc/fstab
+  replace:
+    path: /etc/fstab
+    regexp: '(^/.*swap*)'
+    replace: '# \1'
+
+- name: Add Docker GPG key.
+  rpm_key:
+    key: https://download.docker.com/linux/centos/gpg
+    state: present
+
+- name: Add Docker repository.
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: '/etc/yum.repos.d/docker-ce.repo'
+    owner: root
+    group: root
+    mode: 0644
+
+
+- name: Remove buildah,runc,cockpit-podman,podman
+  yum:
+    name: "{{ packages }}"
+    state: absent
+  vars:
+    packages:
+    - buildah
+    - podman
+    - runc
+
+- name: Install Docker and dependencies
+  yum:
+    name: "{{ packages }}"
+    state: present
+  vars:
+    packages:
+    - docker-ce
+    - docker-ce-cli
+    - containerd.io
+
+- name: Enabling docker service
+  service: 
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Install docker-compose
+  shell:
+    curl -L "https://github.com/docker/compose/releases/download/1.28.6/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+- name: Change mod on docker-compose
+  file:
+    path: /usr/local/bin/docker-compose
+    mode: '777'
+
+- name: Disabling Firewalld service
+  service: 
+    name: firewalld
+    state: stopped
+    enabled: no
+
+- name: Enabling Bridge Firewall Rule
+  shell: "echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables"
+
+- name: Touch kubernetes bridge
+  blockinfile:
+    path: /etc/sysctl.d/k8s.conf
+    create: yes
+    block: |
+     net.bridge.bridge-nf-call-ip6tables = 1
+     net.bridge.bridge-nf-call-iptables = 1
+  
+- name: Change docker daemon cgroup driver
+  copy:
+          content: |
+                  {
+                  "exec-opts": ["native.cgroupdriver=systemd"]
+                  }
+          dest: /etc/docker/daemon.json
+
+- name: Restart Docker Daemon
+  service: 
+    name: docker 
+    state: restarted
+    enabled: yes
+
+
+- name: Ensure Kubernetes repository exists.
+  yum_repository:
+    name: kubernetes
+    description: Kubernetes
+    enabled: yes
+    gpgcheck: yes
+    repo_gpgcheck: yes
+    state: present
+    exclude: 
+    - kubelet
+    - kubeadm
+    - kubectl
+    baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64/
+    gpgkey:
+    - https://packages.cloud.google.com/yum/doc/yum-key.gpg
+    - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+- name: Import a key from a file
+  rpm_key:
+    state: absent
+    key: https://packages.cloud.google.com/yum/doc/yum-key.gpg
+- name: Import a key from a file
+  rpm_key:
+    state: absent
+    key: https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+
+- name: Install Kubectl,Kubeadm,Kubelet
+  yum:
+    name: "{{ packages }}"
+    state: present
+    disable_excludes: kubernetes
+  vars:
+    packages:
+    - kubectl
+    - kubeadm
+    - kubelet
+
+- name: Enabling Kubelet Service
+  service: 
+    name: kubelet
+    state: started
+    enabled: yes
+
+- name: Add Kubernetes Autocomplete
+  lineinfile:
+    path: ~/.bashrc
+    line: source <(kubectl completion bash)
