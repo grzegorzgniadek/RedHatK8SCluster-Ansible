@@ -61,7 +61,7 @@ systemctl restart haproxy
 ## Set up cluster
 ##### Run ansible-playbook on Masternode1 with ip 192.168.1.2
 ```
-git clone https://github.com/moody1511/RedHat-HA-KubernetesCluster.git
+git clone https://github.com/grzegorzgniadek/RedHatK8SCluster-Ansible
 cd RedHat-HA-KubernetesCluster
 ansible-playbook -Kk site.yaml
 ```
